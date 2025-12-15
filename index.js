@@ -3,8 +3,9 @@ const cors = require('cors');
 require('dotenv').config();
 const app = express();
 const port = process.env.PORT || 5000;
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const jwt = require('jsonwebtoken');
+
 const cookieParser = require('cookie-parser');
 
 
@@ -15,6 +16,7 @@ app.use(cors({
     'http://localhost:5173',
     'http://localhost:5174',
     'http://127.0.0.1:5173',
+    'https://loanlink-bd.netlify.app',
   ],
   credentials: true
 }));
@@ -22,8 +24,8 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-// MongoDB Connection
 
+// MongoDB Connection
 const uri = process.env.MongoURI;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
@@ -42,7 +44,11 @@ async function run() {
     // Create database and collection
     const database = client.db("LoanLinkDB");
     const usersCollection = database.collection("users");
-    // Auth Related APIs
+    const loansCollection = database.collection("loans");
+    const applicationsCollection = database.collection("applications");
+    const paymentsCollection = database.collection("payments");
+
+ // Auth Related APIs
     app.post('/jwt', async (req, res) => {
       const user = req.body;
       const token = jwt.sign(user, process.env.JWT_SECRET, {
@@ -78,7 +84,7 @@ async function run() {
       });
     };
 
-
+// User Related APIs
     // Create a user 
     app.post('/users', async (req, res) => {
       const user = req.body;
@@ -91,15 +97,150 @@ async function run() {
       res.send(result);
     });
 
-    // Get all users
-    app.get('/users', async (req, res) => {
+    // Get all users (Admin only)
+    app.get('/users', verifyJWT, async (req, res) => {
       const query = {};
       const users = await usersCollection.find(query).toArray();
       res.send(users);
     });
 
+    // Get a single user by email for role verification
+    app.get('/user/:email', async (req, res) => {
+        const email = req.params.email;
+        const query = { email: email };
+        const result = await usersCollection.findOne(query);
+        res.send(result || null);
+    });
 
+    // Update User (Role/Status) - Admin only
+    app.patch('/users/:id', verifyJWT, async (req, res) => {
+        const id = req.params.id;
+        const updates = req.body;
+        const filter = { _id: new ObjectId(id) };
+        const updatedDoc = { $set: updates };
+        const result = await usersCollection.updateOne(filter, updatedDoc);
+        res.send(result);
+    });
 
+    // Delete User API
+    app.delete('/users/:id', verifyJWT, async (req, res) => {
+        const id = req.params.id;
+        const query = { _id: new ObjectId(id) };
+        const result = await usersCollection.deleteOne(query);
+        res.send(result);
+    });
+
+ //Loan Related APIs
+    // Get All Loans (With Search, Filter & Sort)
+    app.get('/all-loans', async (req, res) => {
+      const search = req.query.search;
+      const category = req.query.category;
+      const sort = req.query.sort;
+      const limit = parseInt(req.query.limit) || 0;
+      
+      let query = {};
+
+      // Search Logic
+      if (search) {
+        query.title = { $regex: search, $options: 'i' }; 
+      }
+
+      // Filter Logic
+      if (category && category !== 'All') {
+        query.category = category;
+      }
+
+      // Sort Options
+      let sortOptions = { createdAt: -1 }; 
+      if (sort === 'asc') sortOptions = { interestRate: 1 }; 
+      if (sort === 'desc') sortOptions = { interestRate: -1 }; 
+
+      const result = await loansCollection.find(query).limit(limit).sort(sortOptions).toArray();
+      res.send(result);
+    });
+
+    //  Get Single Loan Details (View Details)
+    app.get('/loans/:id', verifyJWT, async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await loansCollection.findOne(query);
+      res.send(result);
+    });
+
+    // Create Loan (Manager)
+    app.post('/loans', verifyJWT, async (req, res) => {
+        const loan = req.body;
+        const result = await loansCollection.insertOne(loan);
+        res.send(result);
+    });
+
+    //  Get Loans Added by specific Manager (My Added Loans)
+    app.get('/my-added-loans/:email', verifyJWT, async(req, res) => {
+        const email = req.params.email;
+        const query = { addedBy: email };
+        const result = await loansCollection.find(query).toArray();
+        res.send(result);
+    });
+
+    // Update Loan (Admin/Manager)
+    app.patch('/loans/:id', verifyJWT, async (req, res) => {
+        const id = req.params.id;
+        const updates = req.body;
+        const filter = { _id: new ObjectId(id) };
+        const updatedDoc = { $set: updates };
+        const result = await loansCollection.updateOne(filter, updatedDoc);
+        res.send(result);
+    });
+
+    // Delete Loan (Admin)
+    app.delete('/loans/:id', verifyJWT, async (req, res) => {
+        const id = req.params.id;
+        const query = { _id: new ObjectId(id) };
+        const result = await loansCollection.deleteOne(query);
+        res.send(result);
+    });
+
+// Application Related APIs
+    // Get All Applications (Admin/Manager with filter)
+    app.get('/applications', verifyJWT, async (req, res) => {
+        const status = req.query.status;
+        const query = status ? { status } : {};
+        const result = await applicationsCollection.find(query).toArray();
+        res.send(result);
+    });
+
+    // Update Application Status
+    app.patch('/applications/:id', verifyJWT, async (req, res) => {
+        const id = req.params.id;
+        const updates = req.body;
+        const filter = { _id: new ObjectId(id) };
+        const updatedDoc = { $set: updates };
+        const result = await applicationsCollection.updateOne(filter, updatedDoc);
+        res.send(result);
+    });
+
+    // Get User's Loan Applications
+    app.get('/my-applications/:email', verifyJWT, async (req, res) => {
+        const email = req.params.email;
+        const query = { userEmail: email };
+        const result = await applicationsCollection.find(query).toArray();
+        res.send(result);
+    });
+
+    // Create Loan Application
+    app.post('/applications', verifyJWT, async (req, res) => {
+        const application = req.body;
+        const result = await applicationsCollection.insertOne(application);
+        res.send(result);
+    });
+
+    // Cancel/Delete Application
+    app.delete('/applications/:id', verifyJWT, async (req, res) => {
+        const id = req.params.id;
+        const query = { _id: new ObjectId(id) };
+        const result = await applicationsCollection.deleteOne(query);
+        res.send(result);
+    });
 
 
 
