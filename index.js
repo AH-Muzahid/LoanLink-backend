@@ -6,7 +6,7 @@ const port = process.env.PORT || 5000;
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const jwt = require('jsonwebtoken');
 const cookieParser = require('cookie-parser');
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY)
 
 
 
@@ -246,10 +246,9 @@ async function run() {
 
     // Payment Related APIs
 
-    // Payment Checkout Session Create API
     app.post('/create-checkout-session', verifyJWT, async (req, res) => {
-      const { loanId, loanTitle, amount, userName, userEmail } = req.body;
-
+      const { loanId, loanTitle, loanAmount, loanCategory, loanImage, userName, userEmail } = req.body;
+      const amount = 10; // Fixed amount of $10
 
       const priceInCents = amount * 100;
 
@@ -260,8 +259,9 @@ async function run() {
             price_data: {
               currency: 'usd',
               product_data: {
-                name: `Loan Application Fee - ${loanTitle}`,
-
+                name: `Application Fee: ${loanTitle}`,
+                description: `Applicant: ${userName} | Loan Amount: ${loanAmount} | Category: ${loanCategory}`,
+                images: loanImage ? [loanImage] : [],
               },
               unit_amount: priceInCents,
             },
@@ -272,8 +272,11 @@ async function run() {
         success_url: `http://localhost:5173/dashboard/payment/success?session_id={CHECKOUT_SESSION_ID}&loanId=${loanId}`,
         cancel_url: `http://localhost:5173/dashboard/my-loans`,
         customer_email: userEmail,
-        User: userName,
-        Amount: amount,
+        metadata: {
+          loanId: loanId,
+          userName: userName,
+          amount: amount
+        }
       });
 
       res.send({ url: session.url });
