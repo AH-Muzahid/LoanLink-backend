@@ -269,8 +269,8 @@ async function run() {
           },
         ],
         mode: 'payment',
-        success_url: `http://localhost:5173/dashboard/payment/success?session_id={CHECKOUT_SESSION_ID}&loanId=${loanId}`,
-        cancel_url: `http://localhost:5173/dashboard/my-loans`,
+        success_url: `${process.env.CLIENT_URL}/dashboard/payment/success?session_id={CHECKOUT_SESSION_ID}&loanId=${loanId}`,
+        cancel_url: `${process.env.CLIENT_URL}/dashboard/my-loans`,
         customer_email: userEmail,
         metadata: {
           loanId: loanId,
