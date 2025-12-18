@@ -11,14 +11,32 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY)
 
 
 // Middlewares
+// CORS Configuration
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://127.0.0.1:5173',
+  'https://loanlink-bd.netlify.app',
+  process.env.CLIENT_URL, // Production frontend URL
+];
+
 app.use(cors({
-  origin:
-    [
-      'http://localhost:5173',
-      'http://localhost:5174',
-      'http://127.0.0.1:5173',
-      'https://loanlink-bd.netlify.app',
-    ],
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+
+    // Allow if origin is in allowedOrigins
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    // Allow all Vercel preview deployments (*.vercel.app)
+    if (origin.endsWith('.vercel.app')) {
+      return callback(null, true);
+    }
+
+    callback(new Error('Not allowed by CORS'));
+  },
   credentials: true
 }));
 app.use(express.json());
