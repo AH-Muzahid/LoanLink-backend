@@ -5,19 +5,20 @@ const app = express();
 const port = process.env.PORT || 5000;
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const jwt = require('jsonwebtoken');
-
 const cookieParser = require('cookie-parser');
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+
 
 
 // Middlewares
 app.use(cors({
-  origin: 
-  [
-    'http://localhost:5173',
-    'http://localhost:5174',
-    'http://127.0.0.1:5173',
-    'https://loanlink-bd.netlify.app',
-  ],
+  origin:
+    [
+      'http://localhost:5173',
+      'http://localhost:5174',
+      'http://127.0.0.1:5173',
+      'https://loanlink-bd.netlify.app',
+    ],
   credentials: true
 }));
 app.use(express.json());
@@ -48,7 +49,7 @@ async function run() {
     const applicationsCollection = database.collection("applications");
     const paymentsCollection = database.collection("payments");
 
- // Auth Related APIs
+    // Auth Related APIs
     app.post('/jwt', async (req, res) => {
       const user = req.body;
       const token = jwt.sign(user, process.env.JWT_SECRET, {
@@ -57,7 +58,7 @@ async function run() {
       res.cookie('token', token, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
       })
         .send({ success: true });
     });
@@ -84,7 +85,7 @@ async function run() {
       });
     };
 
-// User Related APIs
+    // User Related APIs
     // Create a user 
     app.post('/users', async (req, res) => {
       const user = req.body;
@@ -106,43 +107,43 @@ async function run() {
 
     // Get a single user by email for role verification
     app.get('/user/:email', async (req, res) => {
-        const email = req.params.email;
-        const query = { email: email };
-        const result = await usersCollection.findOne(query);
-        res.send(result || null);
+      const email = req.params.email;
+      const query = { email: email };
+      const result = await usersCollection.findOne(query);
+      res.send(result || null);
     });
 
     // Update User (Role/Status) - Admin only
     app.patch('/users/:id', verifyJWT, async (req, res) => {
-        const id = req.params.id;
-        const updates = req.body;
-        const filter = { _id: new ObjectId(id) };
-        const updatedDoc = { $set: updates };
-        const result = await usersCollection.updateOne(filter, updatedDoc);
-        res.send(result);
+      const id = req.params.id;
+      const updates = req.body;
+      const filter = { _id: new ObjectId(id) };
+      const updatedDoc = { $set: updates };
+      const result = await usersCollection.updateOne(filter, updatedDoc);
+      res.send(result);
     });
 
     // Delete User API
     app.delete('/users/:id', verifyJWT, async (req, res) => {
-        const id = req.params.id;
-        const query = { _id: new ObjectId(id) };
-        const result = await usersCollection.deleteOne(query);
-        res.send(result);
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await usersCollection.deleteOne(query);
+      res.send(result);
     });
 
- //Loan Related APIs
+    //Loan Related APIs
     // Get All Loans (With Search, Filter & Sort)
     app.get('/all-loans', async (req, res) => {
       const search = req.query.search;
       const category = req.query.category;
       const sort = req.query.sort;
       const limit = parseInt(req.query.limit) || 0;
-      
+
       let query = {};
 
       // Search Logic
       if (search) {
-        query.title = { $regex: search, $options: 'i' }; 
+        query.title = { $regex: search, $options: 'i' };
       }
 
       // Filter Logic
@@ -151,9 +152,9 @@ async function run() {
       }
 
       // Sort Options
-      let sortOptions = { createdAt: -1 }; 
-      if (sort === 'asc') sortOptions = { interestRate: 1 }; 
-      if (sort === 'desc') sortOptions = { interestRate: -1 }; 
+      let sortOptions = { createdAt: -1 };
+      if (sort === 'asc') sortOptions = { interestRate: 1 };
+      if (sort === 'desc') sortOptions = { interestRate: -1 };
 
       const result = await loansCollection.find(query).limit(limit).sort(sortOptions).toArray();
       res.send(result);
@@ -169,81 +170,132 @@ async function run() {
 
     // Create Loan (Manager)
     app.post('/loans', verifyJWT, async (req, res) => {
-        const loan = req.body;
-        const result = await loansCollection.insertOne(loan);
-        res.send(result);
+      const loan = req.body;
+      const result = await loansCollection.insertOne(loan);
+      res.send(result);
     });
 
     //  Get Loans Added by specific Manager (My Added Loans)
-    app.get('/my-added-loans/:email', verifyJWT, async(req, res) => {
-        const email = req.params.email;
-        const query = { addedBy: email };
-        const result = await loansCollection.find(query).toArray();
-        res.send(result);
+    app.get('/my-added-loans/:email', verifyJWT, async (req, res) => {
+      const email = req.params.email;
+      const query = { addedBy: email };
+      const result = await loansCollection.find(query).toArray();
+      res.send(result);
     });
 
     // Update Loan (Admin/Manager)
     app.patch('/loans/:id', verifyJWT, async (req, res) => {
-        const id = req.params.id;
-        const updates = req.body;
-        const filter = { _id: new ObjectId(id) };
-        const updatedDoc = { $set: updates };
-        const result = await loansCollection.updateOne(filter, updatedDoc);
-        res.send(result);
+      const id = req.params.id;
+      const updates = req.body;
+      const filter = { _id: new ObjectId(id) };
+      const updatedDoc = { $set: updates };
+      const result = await loansCollection.updateOne(filter, updatedDoc);
+      res.send(result);
     });
 
     // Delete Loan (Admin)
     app.delete('/loans/:id', verifyJWT, async (req, res) => {
-        const id = req.params.id;
-        const query = { _id: new ObjectId(id) };
-        const result = await loansCollection.deleteOne(query);
-        res.send(result);
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await loansCollection.deleteOne(query);
+      res.send(result);
     });
 
-// Application Related APIs
+    // Application Related APIs
     // Get All Applications (Admin/Manager with filter)
     app.get('/applications', verifyJWT, async (req, res) => {
-        const status = req.query.status;
-        const query = status ? { status } : {};
-        const result = await applicationsCollection.find(query).toArray();
-        res.send(result);
+      const status = req.query.status;
+      const query = status ? { status } : {};
+      const result = await applicationsCollection.find(query).toArray();
+      res.send(result);
     });
 
     // Update Application Status
     app.patch('/applications/:id', verifyJWT, async (req, res) => {
-        const id = req.params.id;
-        const updates = req.body;
-        const filter = { _id: new ObjectId(id) };
-        const updatedDoc = { $set: updates };
-        const result = await applicationsCollection.updateOne(filter, updatedDoc);
-        res.send(result);
+      const id = req.params.id;
+      const updates = req.body;
+      const filter = { _id: new ObjectId(id) };
+      const updatedDoc = { $set: updates };
+      const result = await applicationsCollection.updateOne(filter, updatedDoc);
+      res.send(result);
     });
 
     // Get User's Loan Applications
     app.get('/my-applications/:email', verifyJWT, async (req, res) => {
-        const email = req.params.email;
-        const query = { userEmail: email };
-        const result = await applicationsCollection.find(query).toArray();
-        res.send(result);
+      const email = req.params.email;
+      const query = { userEmail: email };
+      const result = await applicationsCollection.find(query).toArray();
+      res.send(result);
     });
 
     // Create Loan Application
     app.post('/applications', verifyJWT, async (req, res) => {
-        const application = req.body;
-        const result = await applicationsCollection.insertOne(application);
-        res.send(result);
+      const application = req.body;
+      const result = await applicationsCollection.insertOne(application);
+      res.send(result);
     });
 
     // Cancel/Delete Application
     app.delete('/applications/:id', verifyJWT, async (req, res) => {
-        const id = req.params.id;
-        const query = { _id: new ObjectId(id) };
-        const result = await applicationsCollection.deleteOne(query);
-        res.send(result);
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await applicationsCollection.deleteOne(query);
+      res.send(result);
     });
 
 
+    // Payment Related APIs
 
+    // Payment Checkout Session Create API
+    app.post('/create-checkout-session', verifyJWT, async (req, res) => {
+      const { loanId, loanTitle, amount, userName, userEmail } = req.body;
+
+
+      const priceInCents = amount * 100;
+
+      const session = await stripe.checkout.sessions.create({
+        payment_method_types: ['card'],
+        line_items: [
+          {
+            price_data: {
+              currency: 'usd',
+              product_data: {
+                name: `Loan Application Fee - ${loanTitle}`,
+
+              },
+              unit_amount: priceInCents,
+            },
+            quantity: 1,
+          },
+        ],
+        mode: 'payment',
+        success_url: `http://localhost:5173/dashboard/payment/success?session_id={CHECKOUT_SESSION_ID}&loanId=${loanId}`,
+        cancel_url: `http://localhost:5173/dashboard/my-loans`,
+        customer_email: userEmail,
+        User: userName,
+        Amount: amount,
+      });
+
+      res.send({ url: session.url });
+    });
+
+    // 2. Payment Success & Status Update API
+
+    app.patch('/payments/success/:loanId', verifyJWT, async (req, res) => {
+      const loanId = req.params.loanId;
+      const { transactionId } = req.body;
+
+      const filter = { _id: new ObjectId(loanId) };
+      const updateDoc = {
+        $set: {
+          feeStatus: 'paid',
+          transactionId: transactionId,
+          paidAt: new Date()
+        }
+      };
+      const result = await applicationsCollection.updateOne(filter, updateDoc);
+      res.send(result);
+    });
 
 
 
