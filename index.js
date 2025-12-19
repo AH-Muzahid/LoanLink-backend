@@ -86,13 +86,17 @@ connectDB();
 app.post('/jwt', async (req, res) => {
   const user = req.body;
   const token = jwt.sign(user, process.env.JWT_SECRET, {
-    expiresIn: '1h'
+    expiresIn: '7d' // 7 days instead of 1 hour
   });
-  res.cookie('token', token, {
+
+  const cookieOptions = {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-  })
+    maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days in milliseconds
+  };
+
+  res.cookie('token', token, cookieOptions)
     .send({ success: true });
 });
 
@@ -100,7 +104,14 @@ app.post('/jwt', async (req, res) => {
 app.post('/logout', (req, res) => {
   const user = req.body;
   console.log("logging out", user);
-  res.clearCookie('token', { maxAge: 0 }).send({ success: true });
+
+  const cookieOptions = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+  };
+
+  res.clearCookie('token', cookieOptions).send({ success: true });
 });
 
 // Verify JWT Middleware
