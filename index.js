@@ -375,8 +375,8 @@ app.get('/', (req, res) => {
   res.send('LoanLink Server is Running');
 });
 
-// Start server only in local development
-if (process.env.NODE_ENV !== 'production') {
+// Start server only in local development (not on Vercel)
+if (!process.env.VERCEL) {
   app.listen(port, () => {
     console.log(`LoanLink is running on port: ${port}`);
   });
