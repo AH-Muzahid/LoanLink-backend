@@ -370,6 +370,21 @@ app.patch('/payments/success/:loanId', verifyJWT, async (req, res) => {
 
 
 
+
+
+// Debug endpoint to check environment
+app.get('/debug', (req, res) => {
+  res.json({
+    NODE_ENV: process.env.NODE_ENV,
+    VERCEL: process.env.VERCEL,
+    isProduction: process.env.NODE_ENV === 'production' || process.env.VERCEL === '1',
+    cookieSettings: {
+      secure: process.env.NODE_ENV === 'production' || process.env.VERCEL === '1',
+      sameSite: (process.env.NODE_ENV === 'production' || process.env.VERCEL === '1') ? 'none' : 'lax'
+    }
+  });
+});
+
 // Routes
 app.get('/', (req, res) => {
   res.send('LoanLink Server is Running');
