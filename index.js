@@ -340,7 +340,13 @@ app.get('/', (req, res) => {
   res.send('LoanLink Server is Running');
 });
 
-app.listen(port, () => {
-  console.log(`LoanLink is running on port: ${port}`);
-});
+// Start server only in local development
+if (process.env.NODE_ENV !== 'production') {
+  app.listen(port, () => {
+    console.log(`LoanLink is running on port: ${port}`);
+  });
+}
+
+// Export for Vercel serverless
+module.exports = app;
 
