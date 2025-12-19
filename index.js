@@ -100,15 +100,21 @@ app.post('/jwt', async (req, res) => {
     expiresIn: '7d' // 7 days instead of 1 hour
   });
 
+  // Detect if we're in production (Vercel)
+  const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
+
   const cookieOptions = {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-    maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days in milliseconds
+    secure: isProduction,
+    sameSite: isProduction ? 'none' : 'lax',
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in milliseconds
+    path: '/'
   };
 
+  console.log('Setting cookie with options:', cookieOptions);
+
   res.cookie('token', token, cookieOptions)
-    .send({ success: true });
+    .send({ success: true, token });
 });
 
 // Logout API
@@ -116,10 +122,14 @@ app.post('/logout', (req, res) => {
   const user = req.body;
   console.log("logging out", user);
 
+  // Detect if we're in production (Vercel)
+  const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
+
   const cookieOptions = {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    secure: isProduction,
+    sameSite: isProduction ? 'none' : 'lax',
+    path: '/'
   };
 
   res.clearCookie('token', cookieOptions).send({ success: true });
