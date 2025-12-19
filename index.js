@@ -81,6 +81,17 @@ async function connectDB() {
 // Initialize connection
 connectDB();
 
+// Middleware to ensure DB connection
+app.use(async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (error) {
+    console.error('Database connection error:', error);
+    res.status(500).send({ message: 'Database connection failed' });
+  }
+});
+
 
 // Auth Related APIs
 app.post('/jwt', async (req, res) => {
