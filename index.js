@@ -116,7 +116,7 @@ app.post('/jwt', async (req, res) => {
     path: '/'
   };
 
-  console.log('Setting cookie with options:', cookieOptions);
+  // console.log('Setting cookie with options:', cookieOptions);
 
   res.cookie('token', token, cookieOptions)
     .send({ success: true, token });
@@ -125,7 +125,7 @@ app.post('/jwt', async (req, res) => {
 // Logout API
 app.post('/logout', (req, res) => {
   const user = req.body;
-  console.log("logging out", user);
+  // console.log("logging out", user);
 
   // Detect if we're in production (Vercel)
   const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
