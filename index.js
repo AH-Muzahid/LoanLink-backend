@@ -2,7 +2,12 @@ const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
 const app = express();
+const helmet = require('helmet');
 const port = process.env.PORT || 5000;
+
+app.use(helmet({
+  contentSecurityPolicy: false,
+}));
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const jwt = require('jsonwebtoken');
 const cookieParser = require('cookie-parser');
@@ -17,12 +22,12 @@ const allowedOrigins = [
   'http://localhost:5174',
   'http://127.0.0.1:5173',
   'https://loanlink-bd.netlify.app',
-  process.env.CLIENT_URL, // Production frontend URL
+  process.env.CLIENT_URL,
 ];
 
 app.use(cors({
   origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
+    // Allow requests with no origin 
     if (!origin) return callback(null, true);
 
     // Allow if origin is in allowedOrigins
