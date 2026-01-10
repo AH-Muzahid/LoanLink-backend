@@ -62,7 +62,7 @@ const client = new MongoClient(uri, {
 });
 
 // Global variables for collections
-let database, usersCollection, loansCollection, applicationsCollection, paymentsCollection;
+let database, usersCollection, loansCollection, applicationsCollection, paymentsCollection, notificationsCollection;
 
 // Connection function with caching for serverless
 async function connectDB() {
@@ -74,13 +74,14 @@ async function connectDB() {
       loansCollection = database.collection("loans");
       applicationsCollection = database.collection("applications");
       paymentsCollection = database.collection("payments");
+      notificationsCollection = database.collection("notifications");
       console.log("Successfully connected to MongoDB!");
     } catch (error) {
       console.error("MongoDB connection error:", error);
       throw error;
     }
   }
-  return { database, usersCollection, loansCollection, applicationsCollection, paymentsCollection };
+  return { database, usersCollection, loansCollection, applicationsCollection, paymentsCollection, notificationsCollection };
 }
 
 // Initialize connection
@@ -281,12 +282,30 @@ app.get('/applications', verifyJWT, async (req, res) => {
 });
 
 // Update Application Status
+// Update Application Status & Notify User
 app.patch('/applications/:id', verifyJWT, async (req, res) => {
   const id = req.params.id;
   const updates = req.body;
   const filter = { _id: new ObjectId(id) };
   const updatedDoc = { $set: updates };
   const result = await applicationsCollection.updateOne(filter, updatedDoc);
+
+  // Send Notification if status changed
+  if (result.modifiedCount > 0 && updates.status) {
+    // Find application to get user email
+    const application = await applicationsCollection.findOne(filter);
+    if (application) {
+      const notification = {
+        userEmail: application.userEmail,
+        message: `Your loan application for ${application.loanTitle} has been ${updates.status}.`,
+        type: updates.status === 'approved' ? 'success' : 'error',
+        timestamp: new Date(),
+        read: false
+      };
+      await notificationsCollection.insertOne(notification);
+    }
+  }
+
   res.send(result);
 });
 
@@ -367,6 +386,45 @@ app.patch('/payments/success/:loanId', verifyJWT, async (req, res) => {
     }
   };
   const result = await applicationsCollection.updateOne(filter, updateDoc);
+  res.send(result);
+});
+
+
+// Get notifications for a specific user
+app.get('/notifications/:email', verifyJWT, async (req, res) => {
+  const email = req.params.email;
+  const query = { userEmail: email };
+  const result = await notificationsCollection.find(query).sort({ timestamp: -1 }).toArray();
+  res.send(result);
+});
+
+// Mark single notification as read
+app.patch('/notifications/mark-read/:id', verifyJWT, async (req, res) => {
+  const id = req.params.id;
+  const filter = { _id: new ObjectId(id) };
+  const updateDoc = {
+    $set: { read: true }
+  };
+  const result = await notificationsCollection.updateOne(filter, updateDoc);
+  res.send(result);
+});
+
+// Mark ALL notifications as read for a user
+app.patch('/notifications/mark-all-read/:email', verifyJWT, async (req, res) => {
+  const email = req.params.email;
+  const filter = { userEmail: email, read: false };
+  const updateDoc = {
+    $set: { read: true }
+  };
+  const result = await notificationsCollection.updateMany(filter, updateDoc);
+  res.send(result);
+});
+
+// Delete a notification
+app.delete('/notifications/:id', verifyJWT, async (req, res) => {
+  const id = req.params.id;
+  const query = { _id: new ObjectId(id) };
+  const result = await notificationsCollection.deleteOne(query);
   res.send(result);
 });
 
