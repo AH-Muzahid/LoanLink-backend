@@ -214,7 +214,11 @@ app.get('/all-loans', async (req, res) => {
 
   // Search Logic
   if (search) {
-    query.title = { $regex: search, $options: 'i' };
+    query.$or = [
+      { title: { $regex: search, $options: 'i' } },
+      { category: { $regex: search, $options: 'i' } },
+      { description: { $regex: search, $options: 'i' } }
+    ];
   }
 
   // Filter Logic
@@ -302,7 +306,6 @@ app.get('/applications', verifyJWT, async (req, res) => {
   res.send(result);
 });
 
-// Update Application Status
 // Update Application Status & Notify User
 app.patch('/applications/:id', verifyJWT, async (req, res) => {
   const id = req.params.id;
