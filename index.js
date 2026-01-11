@@ -243,6 +243,27 @@ app.get('/loans/:id', verifyJWT, async (req, res) => {
 app.post('/loans', verifyJWT, async (req, res) => {
   const loan = req.body;
   const result = await loansCollection.insertOne(loan);
+
+  // Broadcast Notification to ALL users
+  if (result.insertedId) {
+    try {
+      const allUsers = await usersCollection.find({}, { projection: { email: 1 } }).toArray();
+      if (allUsers.length > 0) {
+        const notifications = allUsers.map(u => ({
+          userEmail: u.email,
+          message: `New Loan Available: ${loan.title || 'Check it out!'}`,
+          type: 'info',
+          path: `/loans/${result.insertedId}`, // Direct link to details
+          timestamp: new Date(),
+          read: false
+        }));
+        await notificationsCollection.insertMany(notifications);
+      }
+    } catch (error) {
+      console.error("Failed to broadcast notifications:", error);
+    }
+  }
+
   res.send(result);
 });
 
