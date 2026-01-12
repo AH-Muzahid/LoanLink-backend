@@ -248,14 +248,16 @@ app.post('/loans', verifyJWT, async (req, res) => {
   const loan = req.body;
   const result = await loansCollection.insertOne(loan);
 
-  // Broadcast Notification to ALL users
+  // Broadcast Notification to BORROWERS only
   if (result.insertedId) {
     try {
-      const allUsers = await usersCollection.find({}, { projection: { email: 1 } }).toArray();
-      if (allUsers.length > 0) {
-        const notifications = allUsers.map(u => ({
+      // Find only borrowers
+      const borrowers = await usersCollection.find({ role: 'borrower' }, { projection: { email: 1 } }).toArray();
+
+      if (borrowers.length > 0) {
+        const notifications = borrowers.map(u => ({
           userEmail: u.email,
-          message: `New Loan Available: ${loan.title || 'Check it out!'}`,
+          message: `New Loan Opportunity! 🚀 ${loan.title || 'Check it out'} is now available.`,
           type: 'info',
           path: `/loans/${result.insertedId}`, // Direct link to details
           timestamp: new Date(),
