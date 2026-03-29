@@ -106,18 +106,15 @@ app.post('/jwt', async (req, res) => {
     expiresIn: '7d' // 7 days instead of 1 hour
   });
 
-  // Detect if we're in production (Vercel)
-  const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
+  const isProduction = process.env.NODE_ENV === 'production';
 
   const cookieOptions = {
     httpOnly: true,
     secure: isProduction,
-    sameSite: isProduction ? 'none' : 'lax',
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in milliseconds
+    sameSite: isProduction ? 'none' : 'strict',
+    maxAge: 7 * 24 * 60 * 60 * 1000,
     path: '/'
   };
-
-  // console.log('Setting cookie with options:', cookieOptions);
 
   res.cookie('token', token, cookieOptions)
     .send({ success: true, token });
@@ -128,13 +125,12 @@ app.post('/logout', (req, res) => {
   const user = req.body;
   // console.log("logging out", user);
 
-  // Detect if we're in production (Vercel)
-  const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
+  const isProduction = process.env.NODE_ENV === 'production';
 
   const cookieOptions = {
     httpOnly: true,
     secure: isProduction,
-    sameSite: isProduction ? 'none' : 'lax',
+    sameSite: isProduction ? 'none' : 'strict',
     path: '/'
   };
 
@@ -143,7 +139,8 @@ app.post('/logout', (req, res) => {
 
 // Verify JWT Middleware
 const verifyJWT = (req, res, next) => {
-  const token = req.cookies.token;
+  const authHeader = req.headers.authorization;
+  const token = authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : req.cookies?.token;
   if (!token) {
     return res.status(401).send({ message: 'Unauthorized access' });
   }
